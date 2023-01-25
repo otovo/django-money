@@ -244,7 +244,7 @@ class TestVanillaMoneyField:
     )
     @pytest.mark.usefixtures("objects_setup")
     def test_all_lookups(self, lookup, rhs, expected):
-        kwargs = {"amount1__" + lookup: rhs}
+        kwargs = {f"amount1__{lookup}": rhs}
         assert ModelWithTwoMoneyFields.objects.filter(**kwargs).count() == expected
 
     def test_exact_match(self):
@@ -775,7 +775,10 @@ def test_clear_meta_cache(model, manager_name):
     """
     model._meta._expire_cache()
     manager_class = getattr(model, manager_name).__class__
-    assert manager_class.__module__ + "." + manager_class.__name__ == "djmoney.models.managers.MoneyManager"
+    assert (
+        f"{manager_class.__module__}.{manager_class.__name__}"
+        == "djmoney.models.managers.MoneyManager"
+    )
 
 
 class TestFieldAttributes:

@@ -66,7 +66,9 @@ class TestExpandMoneyArgs:
                 assert len(child.children) == 2
                 assert_leafs(child.children)
             else:
-                pytest.fail("There should only be two elements, a tuple and a Q - not a %s" % child)
+                pytest.fail(
+                    f"There should only be two elements, a tuple and a Q - not a {child}"
+                )
 
     def test_and_with_or(self):
         """
@@ -96,7 +98,9 @@ class TestExpandMoneyArgs:
                     elif isinstance(subchild, Q):
                         assert_leafs(subchild.children)
             else:
-                pytest.fail("There should only be two elements, a tuple and a Q - not a %s" % child)
+                pytest.fail(
+                    f"There should only be two elements, a tuple and a Q - not a {child}"
+                )
 
     def test_and_with_two_or(self):
         """
@@ -153,15 +157,16 @@ class TestExpandMoneyArgs:
                                 assert_leafs(subsubchild.children)
                             else:
                                 pytest.fail(
-                                    "There should only be two subsubchild elements, a tuple and a Q - not a %s"
-                                    % subsubchild
+                                    f"There should only be two subsubchild elements, a tuple and a Q - not a {subsubchild}"
                                 )
                     else:
                         pytest.fail(
-                            "There should only be two subchild elements, a tuple and a Q - not a %s" % subsubchild
+                            f"There should only be two subchild elements, a tuple and a Q - not a {subsubchild}"
                         )
             else:
-                pytest.fail("There should only be two child elements, a tuple and a Q - not a %s" % child)
+                pytest.fail(
+                    f"There should only be two child elements, a tuple and a Q - not a {child}"
+                )
 
 
 class TestKwargsExpand:

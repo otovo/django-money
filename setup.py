@@ -48,9 +48,12 @@ def read(fname):
 
 
 def find_version():
-    match = re.search(r"^__version__ = ['\"]([^'\"]*)['\"]", read("djmoney/__init__.py"), re.M)
-    if match:
-        return match.group(1)
+    if match := re.search(
+        r"^__version__ = ['\"]([^'\"]*)['\"]",
+        read("djmoney/__init__.py"),
+        re.M,
+    ):
+        return match[1]
     raise RuntimeError("Unable to find __version__ string.")
 
 

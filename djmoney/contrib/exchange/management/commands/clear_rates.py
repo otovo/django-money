@@ -26,5 +26,5 @@ class Command(BaseExchangeCommand):
         else:
             backend = import_string(options["backend"])
             Rate.objects.filter(backend=backend.name).delete()
-            message = "Successfully cleared rates for %s" % backend.name
+            message = f"Successfully cleared rates for {backend.name}"
         self.success(message)

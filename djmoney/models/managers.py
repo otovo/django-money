@@ -140,22 +140,21 @@ def _expand_money_kwargs(model, args=(), kwargs=None, exclusions=()):
             kwargs[name] = value.amount
             currency_field_name = get_currency_field_name(clean_name, field)
             kwargs[currency_field_name] = smart_str(value.currency)
-        else:
-            if isinstance(field, MoneyField):
-                if isinstance(value, (BaseExpression, F)) and not isinstance(value, (Case, Cast, Coalesce)):
-                    clean_name = _get_clean_name(model, name)
-                    if not isinstance(value, F):
-                        value = prepare_expression(value)
-                    if not _is_money_field(model, value, name):
-                        continue
-                    currency_field_name = get_currency_field_name(clean_name, field)
-                    target_field = _get_field(model, value.name)
-                    kwargs[currency_field_name] = F(get_currency_field_name(value.name, target_field))
-                if is_in_lookup(name, value):
-                    args += (_convert_in_lookup(model, name, value),)
-                    del kwargs[name]
-            elif isinstance(field, CurrencyField) and "defaults" in exclusions:
-                _handle_currency_field(model, name, kwargs)
+        elif isinstance(field, MoneyField):
+            if isinstance(value, (BaseExpression, F)) and not isinstance(value, (Case, Cast, Coalesce)):
+                clean_name = _get_clean_name(model, name)
+                if not isinstance(value, F):
+                    value = prepare_expression(value)
+                if not _is_money_field(model, value, name):
+                    continue
+                currency_field_name = get_currency_field_name(clean_name, field)
+                target_field = _get_field(model, value.name)
+                kwargs[currency_field_name] = F(get_currency_field_name(value.name, target_field))
+            if is_in_lookup(name, value):
+                args += (_convert_in_lookup(model, name, value),)
+                del kwargs[name]
+        elif isinstance(field, CurrencyField) and "defaults" in exclusions:
+            _handle_currency_field(model, name, kwargs)
 
     return args, kwargs
 

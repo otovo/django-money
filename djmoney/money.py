@@ -41,12 +41,11 @@ class Money(DefaultMoney):
 
         When it comes to what number of decimal places to choose, we take the maximum number.
         """
-        selection = [
+        if selection := [
             getattr(candidate, "decimal_places", None)
             for candidate in (self, source)
             if getattr(candidate, "decimal_places", None) is not None
-        ]
-        if selection:
+        ]:
             target.decimal_places = max(selection)
 
     def __add__(self, other):
@@ -102,8 +101,7 @@ class Money(DefaultMoney):
             **MONEY_FORMAT,
             **(self.format_options or {}),
         }
-        locale = get_current_locale()
-        if locale:
+        if locale := get_current_locale():
             format_options["locale"] = locale
         return moneyed.l10n.format_money(self, **format_options)
 

@@ -66,10 +66,9 @@ class MoneyField(MultiValueField):
         if self.disabled:
             return False
         if initial is None:
-            initial = ["" for _ in range(0, len(data))]
-        else:
-            if not isinstance(initial, list):
-                initial = self.widget.decompress(initial)
+            initial = ["" for _ in range(len(data))]
+        elif not isinstance(initial, list):
+            initial = self.widget.decompress(initial)
 
         amount_field, currency_field = self.fields
         amount_initial, currency_initial = initial
@@ -103,7 +102,7 @@ class MoneyField(MultiValueField):
             return True
         # If the currency is valid, has changed and there is some
         # amount data, then the money value has changed.
-        if currency_field.has_changed(currency_initial, currency_data) and amount_data:
-            return True
-
-        return False
+        return bool(
+            currency_field.has_changed(currency_initial, currency_data)
+            and amount_data
+        )

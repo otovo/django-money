@@ -30,10 +30,7 @@ def get_value(obj, expr):
     """
     Extracts value from object or expression.
     """
-    if isinstance(expr, F):
-        expr = getattr(obj, expr.name)
-    else:
-        expr = expr.value
+    expr = getattr(obj, expr.name) if isinstance(expr, F) else expr.value
     if isinstance(expr, OldMoney):
         expr = Money(expr.amount, expr.currency)
     return expr
@@ -126,8 +123,7 @@ class MoneyFieldProxy:
 
     def prepare_value(self, obj, value):
         validate_money_value(value)
-        currency = get_currency(value)
-        if currency:
+        if currency := get_currency(value):
             self.set_currency(obj, currency)
         return self.field.to_python(value)
 
@@ -297,8 +293,10 @@ class MoneyField(models.DecimalField):
         return self.default not in (None, NOT_PROVIDED)
 
     def formfield(self, **kwargs):
-        defaults = {"form_class": forms.MoneyField, "decimal_places": self.decimal_places}
-        defaults.update(kwargs)
+        defaults = {
+            "form_class": forms.MoneyField,
+            "decimal_places": self.decimal_places,
+        } | kwargs
         defaults["currency_choices"] = self.currency_choices
         defaults["default_currency"] = self.default_currency
         if self._has_default:

@@ -9,7 +9,7 @@ from .conftest import ExchangeTest, FixedOneBackend, FixedTwoBackend
 
 pytestmark = pytest.mark.django_db
 
-BACKEND_PATH = FixedOneBackend.__module__ + "." + FixedOneBackend.__name__
+BACKEND_PATH = f"{FixedOneBackend.__module__}.{FixedOneBackend.__name__}"
 
 
 class TestCommand(ExchangeTest):

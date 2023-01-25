@@ -55,12 +55,16 @@ def get_rate(source, target, backend=None):
 
 def _get_rate(source, target, backend):
     source, target = str(source), str(target)
-    rates = Rate.objects.filter(currency__in=(source, target), backend=backend).select_related("backend")
-    if not rates:
+    if rates := Rate.objects.filter(
+        currency__in=(source, target), backend=backend
+    ).select_related("backend"):
+        return (
+            _try_to_get_rate_directly(source, target, rates[0])
+            if len(rates) == 1
+            else _get_rate_via_base(rates, target)
+        )
+    else:
         raise MissingRate(f"Rate {source} -> {target} does not exist")
-    if len(rates) == 1:
-        return _try_to_get_rate_directly(source, target, rates[0])
-    return _get_rate_via_base(rates, target)
 
 
 def _try_to_get_rate_directly(source, target, rate):

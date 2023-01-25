@@ -34,11 +34,10 @@ class MoneyLocalizeNode(template.Node):
         use_l10n = True
 
         # GET variable var_name
-        if len(tokens) > 3:
-            if tokens[-2] == "as":
-                var_name = parser.compile_filter(tokens[-1])
+        if len(tokens) > 3 and tokens[-2] == "as":
+            var_name = parser.compile_filter(tokens[-1])
                 # remove the already used data
-                tokens = tokens[0:-2]
+            tokens = tokens[:-2]
 
         # GET variable use_l10n
         if tokens[-1].lower() in ("on", "off"):

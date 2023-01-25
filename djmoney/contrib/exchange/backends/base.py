@@ -34,8 +34,7 @@ class BaseExchangeBackend:
         Updates base url with provided GET parameters.
         """
         parts = list(urlparse(self.url))
-        query = dict(parse_qsl(parts[4]))
-        query.update(params)
+        query = dict(parse_qsl(parts[4])) | params
         parts[4] = urlencode(query)
         return urlunparse(parts)
 
