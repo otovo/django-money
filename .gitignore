@@ -18,6 +18,7 @@ build
 .tox
 __pycache__
 
+.python-version
 .project
 .pydevproject
 .settings

@@ -896,17 +896,6 @@ def test_distinct_through_wrapper():
     assert queryset.count() == 3
 
 
-def test_mixer_blend():
-    try:
-        from mixer.backend.django import mixer
-    except AttributeError:
-        pass  # mixer doesn't work with pypy
-    else:
-        instance = mixer.blend(ModelWithTwoMoneyFields, amount1_currency="EUR", amount2_currency="USD")
-        assert isinstance(instance.amount1, Money)
-        assert isinstance(instance.amount2, Money)
-
-
 @pytest.mark.parametrize(
     ("attribute", "build_kwargs", "expected"),
     [

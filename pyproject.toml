@@ -1,7 +1,64 @@
+[tool.poetry]
+name = "django-money"
+version = "3.0.1"
+description = "Django Money"
+authors = ["otovo cloud <ops@otovo.com>"]
+packages = [
+    { include = "djmoney" },
+]
+
+[tool.poetry.dependencies]
+python = "^3.9 || ^3.10"
+django = "^4.1"
+py-moneyed = "^2.0"
+
+
+[tool.poetry.dev-dependencies]
+pytest = "^7 || ^6"
+codecov = "^2.1.9"
+pytest-django = "*"
+pytest-pythonpath = "*"
+python-semantic-release = "^7.33.0"
+mypy = "^0.991"
+django-stubs = "1.14.0"
+black = "^22.3.0"
+isort = "^5.5.4"
+
+
 [build-system]
-requires = ["setuptools >= 40.6.0", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.semantic_release]
+version_variable = "djmoney/__init__.py:__version__"
+build_command = "pip install poetry && poetry build"
 
 [tool.black]
 line-length = 120
-target-version = ["py35"]
+target-version = ['py310']
+skip-string-normalization = true
+exclude = '(/(\.venv|migrations)/)'
+quiet = true
+
+[tool.isort]
+profile = "black"
+combine_as_imports = true
+include_trailing_comma = true
+line_length = 120
+multi_line_output = 3
+lines_after_imports = 2
+sections = [
+    'FUTURE',
+    'STDLIB',
+    'DJANGO',
+    'THIRDPARTY',
+    'FIRSTPARTY',
+    'LOCALFOLDER'
+]
+known_django = ['django']
+known_first_party = ['tests', 'djmoney', 'moneyed']
+known_third_party = [
+	'moneyed',
+	'pytest',
+	'rest_framework',
+]

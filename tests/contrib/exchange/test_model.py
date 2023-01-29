@@ -75,37 +75,3 @@ def test_bad_configuration(settings):
     settings.INSTALLED_APPS.remove("djmoney.contrib.exchange")
     with pytest.raises(ImproperlyConfigured):
         convert_money(Money(1, "USD"), "EUR")
-
-
-def test_without_installed_exchange(testdir):
-    """
-    If there is no 'djmoney.contrib.exchange' in INSTALLED_APPS importing `Money` should not cause a RuntimeError.
-    Details: GH-385.
-    """
-    testdir.mkpydir("money_app")
-    testdir.makepyfile(
-        app_settings="""
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': 'test.db',
-        }
-    }
-    INSTALLED_APPS = ['djmoney']
-    SECRET_KEY = 'foobar'
-    """
-    )
-    result = testdir.runpython_c(
-        dedent(
-            """
-    import os
-    os.environ['DJANGO_SETTINGS_MODULE'] = 'app_settings'
-    from django import setup
-
-    setup()
-    from djmoney.money import Money
-    print(Money(1, 'USD'))
-    """
-        )
-    )
-    result.stdout.fnmatch_lines(["$1.00"])

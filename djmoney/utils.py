@@ -11,7 +11,7 @@ MONEY_CLASSES = (Money, OldMoney)
 def get_currency_field_name(name, field=None):
     if field and getattr(field, "currency_field_name", None):
         return field.currency_field_name
-    return "%s_currency" % name
+    return f"{name}_currency"
 
 
 def get_amount(value):
