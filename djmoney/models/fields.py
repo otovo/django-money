@@ -1,11 +1,18 @@
+from __future__ import annotations
+from django.utils.translation import gettext_lazy as _
+import decimal
+import math
+from django.core import checks, exceptions
+
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError
 from django.core.validators import DecimalValidator
 from django.db import models
 from django.db.models import NOT_PROVIDED, F, Field, Func, Value
-from django.db.models.expressions import BaseExpression
 from django.db.models.signals import class_prepared
+from django.db.models.expressions import BaseExpression, Combinable
+from django.db.models.query_utils import DeferredAttribute
 from django.utils.encoding import smart_str
 from django.utils.functional import cached_property
 
@@ -81,7 +88,7 @@ def get_currency(value):
         return value[1]
 
 
-class MoneyFieldProxy:
+class MoneyFieldProxy(DeferredAttribute):
     def __init__(self, field):
         self.field = field
         self.currency_field_name = get_currency_field_name(self.field.name, self.field)
@@ -165,22 +172,26 @@ class CurrencyField(models.CharField):
             super().contribute_to_class(cls, name)
 
 
-class MoneyField(models.DecimalField):
+class MoneyField(models.Field):
+    empty_strings_allowed = False
     description = "A field which stores both the currency and amount of money."
+    descriptor_class = MoneyFieldProxy
+    _pyi_private_set_type: Money | Combinable
+    _pyi_private_get_type: Money
+    _pyi_lookup_exact_type: Money
 
     def __init__(
         self,
+        decimal_places: int = DECIMAL_PLACES,
+        max_digits: int | None = None,
         verbose_name=None,
         name=None,
-        max_digits=None,
-        decimal_places=DECIMAL_PLACES,
         default=NOT_PROVIDED,
         default_currency=DEFAULT_CURRENCY,
         currency_choices=CURRENCY_CHOICES,
         currency_max_length=CURRENCY_CODE_MAX_LENGTH,
         currency_field_name=None,
-        money_descriptor_class=MoneyFieldProxy,
-        **kwargs
+        **kwargs,
     ):
         nullable = kwargs.get("null", False)
         default = self.setup_default(default, default_currency, nullable)
@@ -191,9 +202,9 @@ class MoneyField(models.DecimalField):
         self.default_currency = default_currency
         self.currency_choices = currency_choices
         self.currency_field_name = currency_field_name
-        self.money_descriptor_class = money_descriptor_class
 
-        super().__init__(verbose_name, name, max_digits, decimal_places, default=default, **kwargs)
+        self.max_digits, self.decimal_places = max_digits, decimal_places
+        super().__init__(verbose_name, name, default=default, **kwargs)
         self.creation_counter += 1
         Field.creation_counter += 1
 
@@ -228,13 +239,28 @@ class MoneyField(models.DecimalField):
         return Money(amount, currency)
 
     def to_python(self, value):
+        if value is None:
+            return value
         if isinstance(value, MONEY_CLASSES):
             value = value.amount
         elif isinstance(value, tuple):
             value = value[0]
         if isinstance(value, float):
-            value = str(value)
-        return super().to_python(value)
+            if math.isnan(value):
+                raise exceptions.ValidationError(
+                    self.error_messages["invalid"],
+                    code="invalid",
+                    params={"value": value},
+                )
+            return self.context.create_decimal_from_float(value)
+        try:
+            return decimal.Decimal(value)
+        except (decimal.InvalidOperation, TypeError, ValueError):
+            raise exceptions.ValidationError(
+                _("%(value)s value must be a Money instance."),
+                code="invalid",
+                params={"value": value},
+            )
 
     def clean(self, value, model_instance):
         """
@@ -250,7 +276,13 @@ class MoneyField(models.DecimalField):
         """
         Default ``DecimalValidator`` doesn't work with ``Money`` instances.
         """
-        return super(models.DecimalField, self).validators + [MoneyValidator(self.max_digits, self.decimal_places)]
+        return super().validators + [
+            MoneyValidator(self.max_digits, self.decimal_places),
+        ]
+
+    @cached_property
+    def context(self):
+        return decimal.Context(prec=self.max_digits)
 
     def contribute_to_class(self, cls, name):
         cls._meta.has_money_field = True
@@ -259,8 +291,6 @@ class MoneyField(models.DecimalField):
             self.add_currency_field(cls, name)
 
         super().contribute_to_class(cls, name)
-
-        setattr(cls, self.name, self.money_descriptor_class(self))
 
     def add_currency_field(self, cls, name):
         """
@@ -282,7 +312,11 @@ class MoneyField(models.DecimalField):
     def get_db_prep_save(self, value, connection):
         if isinstance(value, MONEY_CLASSES):
             value = value.amount
-        return super().get_db_prep_save(value, connection)
+        return connection.ops.adapt_decimalfield_value(self.to_python(value), self.max_digits, self.decimal_places)
+
+    def get_prep_value(self, value):
+        value = super().get_prep_value(value)
+        return self.to_python(value)
 
     def get_default(self):
         if isinstance(self.default, Money):
@@ -297,7 +331,11 @@ class MoneyField(models.DecimalField):
         return self.default not in (None, NOT_PROVIDED)
 
     def formfield(self, **kwargs):
-        defaults = {"form_class": forms.MoneyField, "decimal_places": self.decimal_places}
+        defaults = {
+            "form_class": forms.MoneyField,
+            "decimal_places": self.decimal_places,
+            "max_digits": self.max_digits,
+        }
         defaults.update(kwargs)
         defaults["currency_choices"] = self.currency_choices
         defaults["default_currency"] = self.default_currency
@@ -325,7 +363,86 @@ class MoneyField(models.DecimalField):
             kwargs["currency_field_name"] = self.currency_field_name
         if self.currency_max_length != CURRENCY_CODE_MAX_LENGTH:
             kwargs["currency_max_length"] = self.currency_max_length
+        if self.max_digits is not None:
+            kwargs["max_digits"] = self.max_digits
+        if self.decimal_places is not None:
+            kwargs["decimal_places"] = self.decimal_places
         return name, path, args, kwargs
+
+    def get_internal_type(self):
+        return "DecimalField"
+
+    def check(self, **kwargs):
+        errors = super().check(**kwargs)
+
+        digits_errors = [
+            *self._check_decimal_places(),
+            *self._check_max_digits(),
+        ]
+        if not digits_errors:
+            errors.extend(self._check_decimal_places_and_max_digits(**kwargs))
+        else:
+            errors.extend(digits_errors)
+        return errors
+
+    def _check_decimal_places(self):
+        try:
+            decimal_places = int(self.decimal_places)
+            if decimal_places < 0:
+                raise ValueError()
+        except TypeError:
+            return [
+                checks.Error(
+                    "DecimalFields must define a 'decimal_places' attribute.",
+                    obj=self,
+                    id="fields.E130",
+                )
+            ]
+        except ValueError:
+            return [
+                checks.Error(
+                    "'decimal_places' must be a non-negative integer.",
+                    obj=self,
+                    id="fields.E131",
+                )
+            ]
+        else:
+            return []
+
+    def _check_max_digits(self):
+        try:
+            max_digits = int(self.max_digits)
+            if max_digits <= 0:
+                raise ValueError()
+        except TypeError:
+            return [
+                checks.Error(
+                    "DecimalFields must define a 'max_digits' attribute.",
+                    obj=self,
+                    id="fields.E132",
+                )
+            ]
+        except ValueError:
+            return [
+                checks.Error(
+                    "'max_digits' must be a positive integer.",
+                    obj=self,
+                    id="fields.E133",
+                )
+            ]
+        else:
+            return []
+
+    def _check_decimal_places_and_max_digits(self, **kwargs):
+        if int(self.decimal_places) > int(self.max_digits):
+            return [
+                checks.Error(
+                    "'max_digits' must be greater or equal to 'decimal_places'.",
+                    obj=self,
+                    id="fields.E134",
+                )
+            ]
+        return []
 
 
 def patch_managers(sender, **kwargs):

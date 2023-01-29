@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import warnings
 from types import MappingProxyType
 
@@ -23,7 +25,7 @@ class Money(DefaultMoney):
     Extends functionality of Money with Django-related features.
     """
 
-    use_l10n = None
+    use_l10n: bool | None = None
 
     def __init__(self, *args, format_options=None, **kwargs):
         self.decimal_places = kwargs.pop("decimal_places", DECIMAL_PLACES)
