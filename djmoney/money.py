@@ -2,19 +2,22 @@ from __future__ import annotations
 
 import warnings
 from types import MappingProxyType
+from typing import overload, TYPE_CHECKING
 
 from django.conf import settings
-from django.db.models import F
+from django.db.models.expressions import Combinable, CombinedExpression
 from django.utils import translation
 from django.utils.deconstruct import deconstructible
 from django.utils.html import avoid_wrapping, conditional_escape
 from django.utils.safestring import mark_safe
 
 import moneyed.l10n
-from moneyed import Currency, Money as DefaultMoney
+from moneyed import Currency, Decimal, Money as DefaultMoney
 
 from .settings import DECIMAL_PLACES, MONEY_FORMAT
 
+if TYPE_CHECKING:
+    from typing import Literal
 
 __all__ = ["Money", "Currency"]
 
@@ -51,32 +54,74 @@ class Money(DefaultMoney):
         if selection:
             target.decimal_places = max(selection)
 
-    def __add__(self, other):
-        if isinstance(other, F):
-            return other.__radd__(self)
+    @overload
+    def __add__(self, other: Money | DefaultMoney | Literal[0]) -> Money:
+        ...
+
+    @overload
+    def __add__(self, other: Combinable) -> CombinedExpression:
+        ...
+
+    def __add__(self, other: Money | DefaultMoney | Combinable | Literal[0]) -> Money | CombinedExpression:
+        if isinstance(other, Combinable):
+            return other.__radd__(self.amount)
         other = maybe_convert(other, self.currency)
         result = super().__add__(other)
         self._copy_attributes(other, result)
         return result
 
-    def __sub__(self, other):
-        if isinstance(other, F):
-            return other.__rsub__(self)
+    @overload
+    def __sub__(self, other: Money | DefaultMoney | Literal[0]) -> Money:
+        ...
+
+    @overload
+    def __sub__(self, other: Combinable) -> CombinedExpression:
+        ...
+
+    def __sub__(self, other: Money | DefaultMoney | Combinable | Literal[0]) -> Money | CombinedExpression:
+        if isinstance(other, Combinable):
+            return other.__rsub__(self.amount)
         other = maybe_convert(other, self.currency)
         result = super().__sub__(other)
         self._copy_attributes(other, result)
         return result
 
-    def __mul__(self, other):
-        if isinstance(other, F):
-            return other.__rmul__(self)
+    @overload
+    def __mul__(self, other: Money | DefaultMoney | Decimal | float | int) -> Money:
+        ...
+
+    @overload
+    def __mul__(self, other: Combinable) -> CombinedExpression:
+        ...
+
+    def __mul__(self, other: Money | DefaultMoney | Decimal | float | int | Combinable) -> Money | CombinedExpression:
+        if isinstance(other, Combinable):
+            return other.__rmul__(self.amount)
         result = super().__mul__(other)
         self._copy_attributes(other, result)
         return result
 
-    def __truediv__(self, other):
-        if isinstance(other, F):
-            return other.__rtruediv__(self)
+    def __rmul__(self, other):
+        return self.__mul__(other)
+
+    def __radd__(self, other):
+        return self.__add__(other)
+
+    @overload
+    def __truediv__(self, other: Money) -> Decimal:
+        ...
+
+    @overload
+    def __truediv__(self, other: int | Decimal | float) -> Money:
+        ...
+
+    @overload
+    def __truediv__(self, other: Combinable) -> CombinedExpression:
+        ...
+
+    def __truediv__(self, other: Money | Decimal | float | int | Combinable) -> Money | CombinedExpression | Decimal:
+        if isinstance(other, Combinable):
+            return other.__rtruediv__(self.amount)
         result = super().__truediv__(other)
         if isinstance(result, self.__class__):
             self._copy_attributes(other, result)
@@ -88,7 +133,7 @@ class Money(DefaultMoney):
         raise TypeError("Cannot divide non-Money by a Money instance.")
 
     @property
-    def is_localized(self):
+    def is_localized(self) -> bool:
         if self.use_l10n is None:
             # This definitely raises a warning in Django 4 - we want to ignore RemovedInDjango50Warning
             # However, we cannot ignore this specific warning class as it doesn't exist in older
@@ -146,8 +191,6 @@ class Money(DefaultMoney):
     # DefaultMoney sets those synonym functions
     # we overwrite the 'targets' so the wrong synonyms are called
     # Example: we overwrite __add__; __radd__ calls __add__ on DefaultMoney...
-    __radd__ = __add__
-    __rmul__ = __mul__
 
 
 def get_current_locale():

@@ -11,7 +11,7 @@ from django.core.validators import DecimalValidator
 from django.db import models
 from django.db.models import NOT_PROVIDED, F, Field, Func, Value
 from django.db.models.signals import class_prepared
-from django.db.models.expressions import BaseExpression, Combinable
+from django.db.models.expressions import BaseExpression
 from django.db.models.query_utils import DeferredAttribute
 from django.utils.encoding import smart_str
 from django.utils.functional import cached_property
@@ -176,7 +176,7 @@ class MoneyField(models.Field):
     empty_strings_allowed = False
     description = "A field which stores both the currency and amount of money."
     descriptor_class = MoneyFieldProxy
-    _pyi_private_set_type: Money | Combinable
+    _pyi_private_set_type: Money
     _pyi_private_get_type: Money
     _pyi_lookup_exact_type: Money
 
